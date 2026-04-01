@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Google Sans', Arial, sans-serif;
+      font-size: 13px;
+      color: #202124;
+      background: #fff;
+      padding: 12px;
+    }
+
+    /* ── Section label ───────────────────────────────── */
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #80868b;
+      margin-bottom: 6px;
+    }
+
+    /* ── Current label badge ─────────────────────────── */
+    #current-wrap {
+      background: #f1f3f4;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 14px;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #current-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #dadce0;
+      flex-shrink: 0;
+    }
+    #current-text {
+      font-size: 12px;
+      color: #5f6368;
+    }
+
+    /* ── Select ──────────────────────────────────────── */
+    select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #202124;
+      background: #fff;
+      cursor: pointer;
+      outline: none;
+      margin-bottom: 10px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235f6368'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+    select:focus { border-color: #1a73e8; }
+
+    /* ── Preview chip ────────────────────────────────── */
+    #preview-chip {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      border: 1px solid #dadce0;
+    }
+    #preview-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    #preview-name { color: #202124; }
+
+    /* ── Button ──────────────────────────────────────── */
+    button {
+      width: 100%;
+      padding: 8px;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover  { background: #1765cc; }
+    button:active { background: #185abc; }
+    button:disabled { background: #dadce0; color: #80868b; cursor: default; }
+
+    /* ── Divider ─────────────────────────────────────── */
+    hr { border: none; border-top: 1px solid #e8eaed; margin: 14px 0; }
+
+    /* ── Status message ──────────────────────────────── */
+    #status {
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      display: none;
+      margin-top: 10px;
+    }
+    #status.ok    { background: #e6f4ea; color: #137333; }
+    #status.error { background: #fce8e6; color: #c5221f; }
+    #status.info  { background: #e8f0fe; color: #1967d2; }
+
+    /* ── Spinner ─────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid #fff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Style list (collapsed) ──────────────────────── */
+    .style-group { margin-bottom: 4px; }
+    .group-header {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #80868b;
+      padding: 4px 0 2px;
+    }
+    .style-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .style-option:hover { background: #f1f3f4; }
+    .style-option.selected { background: #e8f0fe; }
+    .opt-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .opt-label { font-size: 12px; color: #202124; }
+    .opt-id    { font-size: 10px; color: #80868b; margin-left: auto; }
+  </style>
+</head>
+<body>
+
+  <!-- Current paragraph label -->
+  <div class="section-label">Párrafo seleccionado</div>
+  <div id="current-wrap">
+    <div id="current-dot"></div>
+    <span id="current-text">Cargando...</span>
+  </div>
+
+  <!-- Style picker -->
+  <div class="section-label">Seleccionar etiqueta</div>
+  <select id="label-select" onchange="onSelectChange()">
+    <option value="">— Elige una etiqueta —</option>
+  </select>
+
+  <!-- Preview of selected label -->
+  <div id="preview-chip">
+    <div id="preview-dot"></div>
+    <span id="preview-name"></span>
+  </div>
+
+  <!-- Apply button -->
+  <button id="apply-btn" onclick="applyLabel()" disabled>Aplicar etiqueta</button>
+
+  <!-- Status -->
+  <div id="status"></div>
+
+  <hr>
+
+  <!-- List of all available styles -->
+  <div class="section-label">Estilos disponibles</div>
+  <div id="style-list"></div>
+
+<script>
+  let STYLES = [];
+  let selectedStyle = null;
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+
+  window.onload = function() {
+    loadStyles();
+    loadCurrentLabel();
+  };
+
+  function loadStyles() {
+    google.script.run
+      .withSuccessHandler(onStylesLoaded)
+      .withFailureHandler(err => showStatus(err.message, 'error'))
+      .getStyles();
+  }
+
+  function loadCurrentLabel() {
+    google.script.run
+      .withSuccessHandler(onCurrentLabelLoaded)
+      .withFailureHandler(() => setCurrentLabel(null))
+      .getCurrentLabel();
+  }
+
+  // ── Callbacks ─────────────────────────────────────────────────────────────
+
+  function onStylesLoaded(styles) {
+    STYLES = styles;
+    populateSelect(styles);
+    buildStyleList(styles);
+  }
+
+  function onCurrentLabelLoaded(labelId) {
+    setCurrentLabel(labelId);
+  }
+
+  // ── UI builders ───────────────────────────────────────────────────────────
+
+  function populateSelect(styles) {
+    const sel = document.getElementById('label-select');
+    sel.innerHTML = '<option value="">— Elige una etiqueta —</option>';
+    styles.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s['ID_Etiqueta'];
+      opt.textContent = `${s['Nombre_Visible']}  (${s['ID_Etiqueta']})`;
+      sel.appendChild(opt);
+    });
+  }
+
+  function buildStyleList(styles) {
+    const container = document.getElementById('style-list');
+    container.innerHTML = '';
+    styles.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'style-option';
+      row.dataset.id = s['ID_Etiqueta'];
+      row.onclick = () => selectStyle(s['ID_Etiqueta']);
+      row.innerHTML = `
+        <div class="opt-dot" style="background:${s['Color_Marcado'] || '#dadce0'}"></div>
+        <span class="opt-label">${s['Nombre_Visible']}</span>
+        <span class="opt-id">${s['ID_Etiqueta']}</span>
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  function setCurrentLabel(labelId) {
+    const dot  = document.getElementById('current-dot');
+    const text = document.getElementById('current-text');
+    if (!labelId) {
+      dot.style.background = '#dadce0';
+      text.textContent = 'Sin etiqueta';
+      return;
+    }
+    const style = STYLES.find(s => s['ID_Etiqueta'] === labelId);
+    if (style) {
+      dot.style.background = style['Color_Marcado'] || '#dadce0';
+      text.textContent = style['Nombre_Visible'];
+    } else {
+      dot.style.background = '#dadce0';
+      text.textContent = labelId;
+    }
+  }
+
+  // ── Interactions ──────────────────────────────────────────────────────────
+
+  function selectStyle(labelId) {
+    // Sync select element
+    document.getElementById('label-select').value = labelId;
+    onSelectChange();
+  }
+
+  function onSelectChange() {
+    const labelId = document.getElementById('label-select').value;
+    const applyBtn = document.getElementById('apply-btn');
+    const chip     = document.getElementById('preview-chip');
+
+    // Highlight list row
+    document.querySelectorAll('.style-option').forEach(el => {
+      el.classList.toggle('selected', el.dataset.id === labelId);
+    });
+
+    if (!labelId) {
+      selectedStyle = null;
+      applyBtn.disabled = true;
+      chip.style.display = 'none';
+      return;
+    }
+
+    selectedStyle = STYLES.find(s => s['ID_Etiqueta'] === labelId);
+    applyBtn.disabled = false;
+
+    // Show preview chip
+    chip.style.display  = 'flex';
+    chip.style.background = (selectedStyle['Color_Marcado'] || '#f1f3f4') + '33';
+    document.getElementById('preview-dot').style.background
+      = selectedStyle['Color_Marcado'] || '#dadce0';
+    document.getElementById('preview-name').textContent
+      = selectedStyle['Nombre_Visible'];
+  }
+
+  function applyLabel() {
+    const labelId = document.getElementById('label-select').value;
+    if (!labelId) return;
+
+    const btn = document.getElementById('apply-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Aplicando...';
+    hideStatus();
+
+    google.script.run
+      .withSuccessHandler(result => {
+        btn.disabled = false;
+        btn.textContent = 'Aplicar etiqueta';
+        if (result.ok) {
+          showStatus(result.msg, 'ok');
+          loadCurrentLabel();   // refresh current label badge
+        } else {
+          showStatus(result.msg, 'error');
+        }
+      })
+      .withFailureHandler(err => {
+        btn.disabled = false;
+        btn.textContent = 'Aplicar etiqueta';
+        showStatus(err.message, 'error');
+      })
+      .applyLabel(labelId);
+  }
+
+  // ── Status helpers ────────────────────────────────────────────────────────
+
+  function showStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = type;
+    el.style.display = 'block';
+  }
+
+  function hideStatus() {
+    const el = document.getElementById('status');
+    el.style.display = 'none';
+  }
+</script>
+</body>
+</html>
