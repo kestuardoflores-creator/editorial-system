@@ -1,0 +1,12 @@
+{
+  "titulo": "Título de la Tesis o Informe Técnico",
+  "subtitulo": "Subtítulo opcional",
+  "autor": "Apellido Paterno Apellido Materno, Nombre",
+  "asesor": "Dr. Nombre del Asesor",
+  "institucion": "Universidad Nacional Mayor de San Marcos",
+  "facultad": "Facultad de Ingeniería de Sistemas e Informática",
+  "programa": "Escuela Profesional de Ingeniería de Sistemas",
+  "tipo_trabajo": "Tesis para optar el Título Profesional de Ingeniero de Sistemas",
+  "ciudad": "Lima",
+  "anio": "2024"
+}
