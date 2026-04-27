@@ -300,6 +300,19 @@ def parse_markdown(filepath):
 # NUMBERING ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── Roman numeral helper ──────────────────────────────────────────────────────
+def _to_roman(n):
+    """Convert integer to uppercase Roman numeral string."""
+    val = [1000,900,500,400,100,90,50,40,10,9,5,4,1]
+    syms = ["M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"]
+    result = ""
+    for i, v in enumerate(val):
+        while n >= v:
+            result += syms[i]
+            n -= v
+    return result
+
+
 class NumberingEngine:
     """Tracks and builds element numbers per chapter."""
 
@@ -313,22 +326,35 @@ class NumberingEngine:
     def next_chapter(self):
         self.chapter_num += 1
 
+    def _format_n(self, n, formato_numero):
+        """Format a number as ARABIC, ROMAN_UPPER, or ROMAN_LOWER."""
+        fmt = str(formato_numero).upper() if formato_numero else "ARABIC"
+        if fmt == "ROMAN_UPPER":
+            return _to_roman(n)
+        elif fmt == "ROMAN_LOWER":
+            return _to_roman(n).lower()
+        return str(n)
+
     def build_prefix(self, style_cfg):
-        """Return numbered prefix string like 'Figura 3.2' or 'Tabla 15'."""
-        label_id    = style_cfg.get("ID_Etiqueta", "")
-        prefijo     = style_cfg.get("Prefijo_Texto", "")
-        separador   = style_cfg.get("Separador_Num", ".")
-        formato     = style_cfg.get("Formato_Prefijo", "CONTINUO")
+        """Return numbered prefix string like 'Figura 3' / 'Tabla II' / 'Ec. 3.2'."""
+        label_id       = style_cfg.get("ID_Etiqueta", "")
+        prefijo        = style_cfg.get("Prefijo_Texto", "")
+        separador      = style_cfg.get("Separador_Num", ".")
+        formato        = style_cfg.get("Formato_Prefijo", "CONTINUO")
+        formato_numero = style_cfg.get("Formato_Numero", "ARABIC")
 
         if formato == "CAPITULO_ELEMENTO":
             key = (label_id, self.chapter_num)
             self.counters[key] = self.counters.get(key, 0) + 1
             n   = self.counters[key]
-            return f"{prefijo} {self.chapter_num}{separador}{n}"
+            n_str = self._format_n(n, formato_numero)
+            return f"{prefijo} {self.chapter_num}{separador}{n_str}".strip()
         else:
             self.global_cnt[label_id] = self.global_cnt.get(label_id, 0) + 1
             n = self.global_cnt[label_id]
-            return f"{prefijo} {n}"
+            n_str = self._format_n(n, formato_numero)
+            sep = separador if separador.strip() else " "
+            return f"{prefijo}{sep}{n_str}".strip()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -567,14 +593,21 @@ def set_margins(section, margenes_cm):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def assemble(normativa_name, output_name=None):
-    # Load normativa
-    norm_path = CONFIG_DIR / f"{normativa_name}.json"
-    if not norm_path.exists():
-        print(f"❌ Normativa no encontrada: {norm_path}")
-        sys.exit(1)
+    # Load normativa — prefer local Excel (user-editable), fallback to JSON
+    xlsx_path = CONFIG_DIR / f"{normativa_name}.xlsx"
+    json_path = CONFIG_DIR / f"{normativa_name}.json"
 
-    with open(norm_path, encoding="utf-8") as f:
-        norm = json.load(f)
+    if xlsx_path.exists():
+        from norm_excel import excel_to_dict
+        norm = excel_to_dict(xlsx_path)
+        print(f"Leyendo normativa desde Excel: {xlsx_path.name}")
+    elif json_path.exists():
+        with open(json_path, encoding="utf-8") as f:
+            norm = json.load(f)
+        print(f"Leyendo normativa desde JSON: {json_path.name}")
+    else:
+        print(f"Normativa no encontrada: {normativa_name}.xlsx / .json")
+        sys.exit(1)
 
     style_map       = {s["ID_Etiqueta"]: s for s in norm["estilos"]}
     inicio_capitulo = norm.get("inicio_capitulo", "NUEVA")
