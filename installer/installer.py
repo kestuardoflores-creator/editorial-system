@@ -29,6 +29,10 @@ except ImportError:
 
 init(autoreset=True)
 
+# Force UTF-8 output on Windows
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
 # ── GitHub config ──────────────────────────────────────────────────────────────
 GITHUB_REPO    = "kestuardoflores-creator/editorial-system"
 GITHUB_BRANCH  = "main"
@@ -48,14 +52,14 @@ def clear():
 
 def banner():
     print(Fore.CYAN + """
-  ╔══════════════════════════════════════════════════╗
-  ║      Sistema de Gestión Editorial v1.0           ║
-  ║      Markdown + Python + Word                    ║
-  ╚══════════════════════════════════════════════════╝
+  +--------------------------------------------------+
+  |      Sistema de Gestion Editorial v1.0           |
+  |      Markdown + Python + Word                    |
+  +--------------------------------------------------+
 """ + Style.RESET_ALL)
 
 def section(title):
-    print(Fore.YELLOW + f"\n  ── {title} " + "─" * (44 - len(title)) + Style.RESET_ALL)
+    print(Fore.YELLOW + f"\n  -- {title} " + "-" * (44 - len(title)) + Style.RESET_ALL)
 
 def ok(msg):
     print(Fore.GREEN + f"  ✔  {msg}" + Style.RESET_ALL)
@@ -346,9 +350,9 @@ def main():
 
     # ── Done ───────────────────────────────────────────────────────────────────
     print(Fore.GREEN + """
-  ╔══════════════════════════════════════════════════╗
-  ║           ¡Instalación completada!               ║
-  ╚══════════════════════════════════════════════════╝
+  +--------------------------------------------------+
+  |         Instalacion completada!                  |
+  +--------------------------------------------------+
 """ + Style.RESET_ALL)
 
     print(Fore.WHITE + f"""  Tu proyecto está listo en:
