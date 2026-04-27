@@ -28,10 +28,8 @@ except ImportError:
     from colorama import Fore, Style, init
 
 init(autoreset=True)
-
-# Force UTF-8 output on Windows
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if os.name == "nt":
+    os.system("chcp 65001 > nul")
 
 # ── GitHub config ──────────────────────────────────────────────────────────────
 GITHUB_REPO    = "kestuardoflores-creator/editorial-system"
