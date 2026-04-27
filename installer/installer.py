@@ -122,17 +122,31 @@ def download_file(url, dest_path):
 
 
 def download_normativa_config(normativa, dest_dir):
-    """Download config/{normativa}.json from GitHub."""
-    url  = f"{GITHUB_RAW}/config/{normativa}.json"
-    dest = dest_dir / "config" / f"{normativa}.json"
+    """Download config/{normativa}.json from GitHub, then convert to Excel."""
+    url       = f"{GITHUB_RAW}/config/{normativa}.json"
+    json_dest = dest_dir / "config" / f"{normativa}.json"
+    xlsx_dest = dest_dir / "config" / f"{normativa}.xlsx"
+
     progress(f"Descargando normativa {normativa}.json...")
     try:
-        download_file(url, dest)
+        download_file(url, json_dest)
         ok(f"Normativa descargada: config/{normativa}.json")
-        return True
     except Exception as e:
         err(f"No se pudo descargar la normativa: {e}")
         return False
+
+    # Convert JSON → Excel for user-friendly editing
+    progress("Convirtiendo normativa a Excel...")
+    try:
+        sys.path.insert(0, str(ROOT_DIR / "assembler"))
+        from norm_excel import json_to_excel
+        json_to_excel(json_dest, xlsx_dest)
+        ok(f"Excel editable creado: config/{normativa}.xlsx")
+        info("Puedes editar los estilos abriendo ese archivo en Excel.")
+    except Exception as e:
+        warn(f"No se pudo crear el Excel: {e}")
+
+    return True
 
 
 def download_examples(normativa, dest_dir):
