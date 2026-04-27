@@ -1,0 +1,6 @@
+word/
+token.env
+__pycache__/
+*.pyc
+.env
+*.tmp
