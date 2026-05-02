@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.claude/
+projects/
+build/
+dist/
+CLAUDE.md
+push.py
+push.pyw
+Anteproyecto_v2.md
+editor_setup.md
+GUIA_CONTENIDO.md
+repo_dump_v2.md
