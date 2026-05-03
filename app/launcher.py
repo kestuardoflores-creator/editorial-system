@@ -13,9 +13,10 @@ else:
 
 sys.path.insert(0, str(APP_DIR / "assembler"))
 
-USER_CONFIG   = PORTABLE_ROOT / "app" / "config"
-USER_EXAMPLES = PORTABLE_ROOT / "app" / "examples"
-PROJECTS_DIR  = PORTABLE_ROOT / "projects"
+USER_CONFIG          = PORTABLE_ROOT / "app" / "config"
+USER_EXAMPLES        = PORTABLE_ROOT / "app" / "examples"
+PROJECTS_DIR         = PORTABLE_ROOT / "projects"
+EXTRA_PROJECTS_FILE  = PORTABLE_ROOT / "extra_projects.json"
 BUNDLED_CONFIG   = APP_DIR / "config"
 BUNDLED_EXAMPLES = APP_DIR / "examples"
 
@@ -49,14 +50,32 @@ def list_normativas():
     return sorted(p.stem for p in USER_CONFIG.glob("*.json") if p.stem != "project")
 
 
-def list_projects():
-    if not PROJECTS_DIR.exists():
+def load_extra_projects():
+    if not EXTRA_PROJECTS_FILE.exists():
         return []
-    return sorted(
-        [p for p in PROJECTS_DIR.iterdir()
-         if p.is_dir() and (p / "config" / "project.json").exists()],
-        key=lambda p: p.stat().st_mtime, reverse=True,
+    try:
+        return [Path(p) for p in json.loads(EXTRA_PROJECTS_FILE.read_text(encoding="utf-8"))]
+    except Exception:
+        return []
+
+
+def save_extra_projects(paths):
+    EXTRA_PROJECTS_FILE.write_text(
+        json.dumps([str(p) for p in paths], indent=2, ensure_ascii=False),
+        encoding="utf-8",
     )
+
+
+def list_projects():
+    seen, result = set(), []
+    if PROJECTS_DIR.exists():
+        for p in PROJECTS_DIR.iterdir():
+            if p.is_dir() and (p / "config" / "project.json").exists():
+                seen.add(p.resolve()); result.append(p)
+    for p in load_extra_projects():
+        if p.exists() and (p / "config" / "project.json").exists() and p.resolve() not in seen:
+            seen.add(p.resolve()); result.append(p)
+    return sorted(result, key=lambda p: p.stat().st_mtime, reverse=True)
 
 
 def create_project(name, location, normativa, log):
@@ -167,7 +186,8 @@ def stop_watcher(log):
 
 def run_assembler(project_dir, normativa, log):
     try:
-        import assembler
+        import importlib, assembler
+        importlib.reload(assembler)
         assembler._set_project_root(project_dir)
         stream = _LogStream(log)
         with redirect_stdout(stream), redirect_stderr(stream):
@@ -308,6 +328,9 @@ class App(tk.Tk):
         tk.Button(acts, text="Refrescar", font=("Segoe UI", 9), bg=WHITE, fg=MUTED,
                   relief="flat", padx=10, pady=8, cursor="hand2",
                   command=self._refresh_projects).pack(side="right")
+        tk.Button(acts, text="Agregar", font=("Segoe UI", 9), bg=WHITE, fg=MUTED,
+                  relief="flat", padx=10, pady=8, cursor="hand2",
+                  command=self._on_add_project).pack(side="right", padx=(0, 4))
 
     def log(self, msg, tag="info"):
         self._log_w.config(state="normal")
@@ -393,6 +416,21 @@ class App(tk.Tk):
         if not p: return
         cb = lambda m, t: self.after(0, self.log, m, t)
         threading.Thread(target=run_assembler, args=(p, self._normativa_of(p), cb), daemon=True).start()
+
+    def _on_add_project(self):
+        path = filedialog.askdirectory(title="Seleccionar carpeta del proyecto")
+        if not path:
+            return
+        p = Path(path)
+        if not (p / "config" / "project.json").exists():
+            messagebox.showerror("No válido", "No se encontró config/project.json en esa carpeta.")
+            return
+        extras = load_extra_projects()
+        if p not in extras:
+            extras.append(p)
+            save_extra_projects(extras)
+        self._refresh_projects()
+        self.log(f"Proyecto agregado: {p.name}", "ok")
 
     def _on_close(self):
         if _observer: stop_watcher(lambda m, t: None)

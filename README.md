@@ -31,12 +31,11 @@ bash run.sh
 ```
 projects/NombreProyecto/
 ├── markdowns/          ← tus archivos de contenido van aquí
-│   ├── 01_portada.json         ← datos de portada (no es .md)
-│   ├── 02_referencias.bib      ← referencias BibTeX (no es .md)
-│   ├── 03_introduccion.md
-│   ├── 04_marco_teorico.md
-│   ├── 05_metodologia.md
-│   └── 06_resultados.md
+│   ├── referencias.bib         ← referencias BibTeX (nombre exacto)
+│   ├── 01_introduccion.md
+│   ├── 02_marco_teorico.md
+│   ├── 03_metodologia.md
+│   └── 04_resultados.md
 ├── assets/
 │   ├── images/         ← imágenes PNG / JPG para figuras
 │   └── data/           ← archivos Excel para tablas
@@ -51,21 +50,7 @@ projects/NombreProyecto/
 
 > Los `.md` se ensamblan en **orden alfabético**. Usa prefijos numéricos (`01_`, `02_`) para controlar el orden.
 
----
-
-## portada.json
-
-```json
-{
-  "titulo":      "Título completo de la tesis",
-  "autor":       "Apellido Paterno Apellido Materno, Nombre",
-  "institucion": "Universidad Nacional",
-  "facultad":    "Facultad de Ingeniería",
-  "programa":    "Escuela de Estudios de Postgrado",
-  "ciudad":      "Ciudad de Guatemala",
-  "anio":        "2024"
-}
-```
+> **Páginas previas al índice** (portada, resumen, dedicatoria, agradecimientos) no se generan — su formato varía según universidad. Agrégalas manualmente en Word al documento final.
 
 ---
 
@@ -113,9 +98,15 @@ Varios autores coinciden [@garcia2021; @lopez2019].
 ### Figuras
 
 ```markdown
-> [!FIG_TIT src="assets/images/mi_grafico.png"]
+> [!FIG_TIT]
 > Descripción breve de la figura
+
+![](assets/images/mi_grafico.png)
+> [!NOTA_FIG]
+> *Nota.* Autor (año). Descripción de la fuente.
 ```
+
+El número de figura se genera automáticamente. La nota es opcional. Los tres elementos (título, imagen, nota) siempre quedan en la misma página.
 
 ### Tablas desde Excel
 
@@ -175,8 +166,12 @@ Diversos estudios han abordado este tema [@smith2020; @garcia2021].
 
 ## Diagrama
 
-> [!FIG_TIT src="assets/images/marco_conceptual.png"]
+> [!FIG_TIT]
 > Diagrama del marco conceptual
+
+![](assets/images/marco_conceptual.png)
+> [!NOTA_FIG]
+> *Nota.* Elaboración propia (2024).
 ```
 
 ---
@@ -187,7 +182,7 @@ Diversos estudios han abordado este tema [@smith2020; @garcia2021].
 2. **Nunca saltes niveles** — no uses `###` si no hay `##` antes.
 3. **Las claves de citas deben coincidir** con las de `referencias.bib`.
 4. **Las imágenes deben existir** en `assets/images/` antes de compilar.
-5. **`portada.json` va en `markdowns/`**, no en `config/`.
-6. **El archivo BibTeX se llama exactamente `referencias.bib`**.
-7. **Orden de archivos = orden alfabético** — usa prefijos `01_`, `02_`.
-8. **`config/normativa.xlsx` tiene prioridad** sobre `config/normativa.json`.
+5. **El archivo BibTeX se llama exactamente `referencias.bib`** y va en `markdowns/`.
+6. **Orden de archivos = orden alfabético** — usa prefijos `01_`, `02_`.
+7. **`config/normativa.xlsx` tiene prioridad** sobre `config/normativa.json`.
+8. **Las páginas previas al índice** (portada, resumen, etc.) se agregan manualmente en Word.

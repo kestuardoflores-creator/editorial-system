@@ -5,6 +5,7 @@ from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from docx import Document
+from docx.shared import Inches
 import mammoth
 
 ROOT = MARKDOWNS_DIR = WORD_DIR = CONFIG_DIR = Path(__file__).parent.parent
@@ -34,8 +35,9 @@ def _log(msg):
 
 def convert_md_to_docx(md_path, normativa):
     try:
-        from assembler import (parse_markdown, add_styled_paragraph,
-                               HEADING_MAP, NumberingEngine, set_margins)
+        from assembler import (parse_markdown, add_styled_paragraph, _insert_image,
+                               HEADING_MAP, NumberingEngine, set_margins, _fig_max_height)
+        from copy import deepcopy
         norm = json.loads((CONFIG_DIR / f"{normativa}.json").read_text(encoding="utf-8"))
         sm   = {s["ID_Etiqueta"]: s for s in norm["estilos"]}
 
@@ -44,18 +46,40 @@ def convert_md_to_docx(md_path, normativa):
         for p in doc.paragraphs: p._element.getparent().remove(p._element)
 
         num = NumberingEngine()
+        max_h = _fig_max_height(doc.sections[0])
+        in_fig_group = False
         for elem in parse_markdown(md_path):
             if elem.kind == "heading":
+                in_fig_group = False
                 lv, text = elem.kw["level"], elem.kw["text"]
                 s = sm.get(HEADING_MAP.get(lv, "TEXTO_APA"), sm.get("TEXTO_APA", {}))
                 if lv == 1: num.next_chapter()
                 add_styled_paragraph(doc, text, s)
             elif elem.kind == "paragraph":
+                in_fig_group = False
                 add_styled_paragraph(doc, elem.kw["text"], sm.get("TEXTO_APA", {}))
+            elif elem.kind == "image":
+                _insert_image(doc, Path(elem.kw["src"]), sm, max_h, keep_with_next=in_fig_group)
             elif elem.kind == "callout":
-                s   = sm.get(elem.kw["tag"], sm.get("TEXTO_APA", {}))
+                tag, attrs, cap = elem.kw["tag"], elem.kw["attrs"], elem.kw["caption"]
+                s   = sm.get(tag, sm.get("TEXTO_APA", {}))
                 pre = num.build_prefix(s) if s.get("Es_Numerable") else ""
-                add_styled_paragraph(doc, f"{pre} {elem.kw['caption']}".strip(), s)
+                if tag == "FIG_TIT":
+                    in_fig_group = True
+                    if attrs.get("src"):
+                        _insert_image(doc, ROOT / attrs["src"], sm, max_h, keep_with_next=True)
+                    p1 = add_styled_paragraph(doc, pre, s) if pre else add_styled_paragraph(doc, cap or "", s)
+                    p1.paragraph_format.keep_with_next = True
+                    if pre and cap:
+                        cs = deepcopy(s); cs["Negrita"] = False
+                        p2 = add_styled_paragraph(doc, cap, cs)
+                        p2.paragraph_format.keep_with_next = True
+                elif tag == "NOTA_FIG":
+                    in_fig_group = False
+                    add_styled_paragraph(doc, cap or "", s)
+                else:
+                    in_fig_group = False
+                    add_styled_paragraph(doc, f"{pre} {cap}".strip(), s)
 
         out = WORD_DIR / (md_path.stem + ".docx")
         _mark(out); doc.save(str(out))

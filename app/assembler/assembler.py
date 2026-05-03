@@ -31,6 +31,7 @@ CALLOUT_RE  = re.compile(r'^\s*>\s*\[!(\w+)(.*?)\]\s*$')
 ATTR_RE     = re.compile(r'(\w+)="([^"]*)"')
 CAPTION_RE  = re.compile(r'^\s*>\s+(.+)$')
 CITE_RE     = re.compile(r'\[@([^\]]+)\]')
+IMG_RE      = re.compile(r'^!\[([^\]]*)\]\(([^)]+)\)\s*$')
 
 
 # ── Style engine ─────────────────────────────────────────────────────────────
@@ -237,6 +238,11 @@ def parse_markdown(path):
     while i < len(lines):
         line = lines[i]
         if not line.strip(): i += 1; continue
+        if re.match(r'^\s*<!--.*-->\s*$', line): i += 1; continue
+        m = IMG_RE.match(line)
+        if m:
+            src = (Path(path).parent / m.group(2)).resolve()
+            elems.append(Elem("image", src=src, alt=m.group(1))); i += 1; continue
         m = re.match(r'^(#{1,6})\s+(.+)$', line)
         if m:
             elems.append(Elem("heading", level=len(m.group(1)), text=m.group(2).strip()))
@@ -250,7 +256,9 @@ def parse_markdown(path):
             elems.append(Elem("callout", tag=tag, attrs=attrs, caption=" ".join(caps))); continue
         txt = [line]; i += 1
         while i < len(lines) and lines[i].strip() and not lines[i].startswith("#") and not CALLOUT_RE.match(lines[i]):
-            txt.append(lines[i]); i += 1
+            if not re.match(r'^\s*<!--.*-->\s*$', lines[i]):
+                txt.append(lines[i])
+            i += 1
         elems.append(Elem("paragraph", text=" ".join(txt).strip()))
     return elems
 
@@ -324,6 +332,49 @@ def build_portada(doc, data, sm):
     add_styled_paragraph(doc, f"{data.get('ciudad','')}, {data.get('anio','')}", s_inf)
 
 
+# ── Image inserter ───────────────────────────────────────────────────────────
+
+def _fig_max_height(section):
+    try:
+        return section.page_height.inches - section.top_margin.inches - section.bottom_margin.inches - 1.5
+    except Exception:
+        return 7.5
+
+
+def _insert_image(doc, img_path, sm, max_height_in=None, keep_with_next=False):
+    img = Path(img_path)
+    if not img.exists():
+        add_styled_paragraph(doc, f"[Imagen no encontrada: {img}]", sm.get("TEXTO_APA", {}))
+        print(f"⚠️ Imagen no encontrada: {img}")
+        return None
+    try:
+        from PIL import Image as _Img
+        import io as _io
+        ip = doc.add_paragraph()
+        ip.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        ip.paragraph_format.keep_with_next = keep_with_next
+        run = ip.add_run()
+        with _Img.open(img) as im:
+            orig_w, orig_h = im.size
+            if img.suffix.lower() == ".webp":
+                buf = _io.BytesIO()
+                im.save(buf, format="PNG")
+                buf.seek(0)
+                src = buf
+            else:
+                src = str(img)
+        natural_h = 5.5 * orig_h / orig_w if orig_w else 5.5
+        if max_height_in and natural_h > max_height_in:
+            run.add_picture(src, height=Inches(max_height_in))
+        else:
+            run.add_picture(src, width=Inches(5.5))
+        return ip
+    except Exception as e:
+        add_styled_paragraph(doc, f"[Error al cargar imagen: {img} — {e}]", sm.get("TEXTO_APA", {}))
+        print(f"⚠️ Imagen: {e}")
+        return None
+
+
 # ── Main assembler ────────────────────────────────────────────────────────────
 
 def assemble(normativa, output=None):
@@ -341,11 +392,7 @@ def assemble(normativa, output=None):
     margenes = norm.get("margenes_cm", {})
     print(f"✅ {norm['normativa']} v{norm['version']}")
 
-    bib    = load_bib(MARKDOWNS_DIR / "referencias.bib")
-    portada = {}
-    port_p  = MARKDOWNS_DIR / "portada.json"
-    if port_p.exists(): portada = json.loads(port_p.read_text(encoding="utf-8"))
-
+    bib      = load_bib(MARKDOWNS_DIR / "referencias.bib")
     md_files = sorted(MARKDOWNS_DIR.glob("*.md"))
     print(f"📄 {len(md_files)} archivos Markdown")
 
@@ -354,18 +401,18 @@ def assemble(normativa, output=None):
     add_page_numbers(doc.sections[0])
     for p in doc.paragraphs: p._element.getparent().remove(p._element)
 
-    build_portada(doc, portada, sm)
-    doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-
     toc, figs, tabs, num, cited = [], [], [], NumberingEngine(), set()
-    indice_cfg  = read_indice_config(CONFIG_DIR / "indice.xlsx")
-    hcounters   = [0] * 6   # heading counters per level for TOC numbering
+    indice_cfg   = read_indice_config(CONFIG_DIR / "indice.xlsx")
+    hcounters    = [0] * 6
+    max_h        = _fig_max_height(doc.sections[0])
+    in_fig_group = False
 
     for idx, md in enumerate(md_files):
         print(f"   [{idx+1}/{len(md_files)}] {md.name}")
         first = True
         for elem in parse_markdown(md):
             if elem.kind == "heading":
+                in_fig_group = False
                 lv, text = elem.kw["level"], elem.kw["text"]
                 s = sm.get(HEADING_MAP.get(lv, "TEXTO_APA"), sm.get("TEXTO_APA", {}))
                 if lv == 1:
@@ -387,37 +434,59 @@ def assemble(normativa, output=None):
                     toc.append(f"{'    ' * (lv - 1)}{prefix}{text}")
                 add_styled_paragraph(doc, text, s, bib); first = False
 
+            elif elem.kind == "image":
+                _insert_image(doc, Path(elem.kw["src"]), sm, max_h, keep_with_next=in_fig_group)
+
             elif elem.kind == "paragraph":
+                in_fig_group = False
                 text = elem.kw["text"]
                 add_styled_paragraph(doc, text, sm.get("TEXTO_APA", {}), bib)
                 cited.update(k.strip().lstrip("@") for kg in CITE_RE.findall(text) for k in kg.split(";"))
 
             elif elem.kind == "callout":
                 tag, attrs, cap = elem.kw["tag"], elem.kw["attrs"], elem.kw["caption"]
-                s = sm.get(tag, sm.get("TEXTO_APA", {}))
+                s   = sm.get(tag, sm.get("TEXTO_APA", {}))
                 pre = num.build_prefix(s) if s.get("Es_Numerable") else ""
 
                 if tag == "FIG_TIT":
-                    img = ROOT / attrs.get("src", "")
-                    if img.exists():
-                        try:
-                            ip = doc.add_paragraph(); ip.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                            ip.add_run().add_picture(str(img), width=Inches(5.5))
-                        except Exception as e: print(f"⚠️ Imagen: {e}")
+                    in_fig_group = True
+                    if attrs.get("src"):
+                        _insert_image(doc, ROOT / attrs["src"], sm, max_h, keep_with_next=True)
+                    p1 = add_styled_paragraph(doc, pre, s) if pre else add_styled_paragraph(doc, cap or "", s)
+                    p1.paragraph_format.keep_with_next = True
+                    if pre and cap:
+                        cs = deepcopy(s); cs["Negrita"] = False
+                        p2 = add_styled_paragraph(doc, cap, cs)
+                        p2.paragraph_format.keep_with_next = True
+                    figs.append(f"{pre}  {cap}")
+
                 elif tag == "TABLA_TIT":
+                    in_fig_group = False
                     h, r = read_excel_table(attrs.get("src", ""), attrs.get("sheet"))
                     if h: add_excel_table(doc, h, r)
+                    if pre:
+                        add_styled_paragraph(doc, pre, s)
+                        if cap:
+                            cs = deepcopy(s); cs["Negrita"] = False
+                            add_styled_paragraph(doc, cap, cs)
+                    else:
+                        add_styled_paragraph(doc, cap or "", s)
+                    tabs.append(f"{pre}  {cap}")
 
-                if pre:
-                    add_styled_paragraph(doc, pre, s)
-                    if cap:
-                        cs = deepcopy(s); cs["Negrita"] = False
-                        add_styled_paragraph(doc, cap, cs)
-                else:
+                elif tag == "NOTA_FIG":
+                    in_fig_group = False
                     add_styled_paragraph(doc, cap or "", s)
 
-                if tag == "FIG_TIT": figs.append(f"{pre}  {cap}")
-                elif tag == "TABLA_TIT": tabs.append(f"{pre}  {cap}")
+                else:
+                    in_fig_group = False
+                    if pre:
+                        add_styled_paragraph(doc, pre, s)
+                        if cap:
+                            cs = deepcopy(s); cs["Negrita"] = False
+                            add_styled_paragraph(doc, cap, cs)
+                    else:
+                        add_styled_paragraph(doc, cap or "", s)
+
                 first = False
 
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
